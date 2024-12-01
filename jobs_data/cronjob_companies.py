@@ -2,13 +2,10 @@
 # This job will be responsible for update the companies jobs_data and save it to a CSV file.
 # https://www.b3.com.br/pt_br/produtos-e-servicos/negociacao/renda-variavel/empresas-listadas.htm
 
-import base64
 import json
-import requests
 import pandas as pd
-import concurrent.futures
-from tqdm import tqdm
 
+from jobs_data.auxiliar import *
 
 URL = 'https://sistemaswebb3-listados.b3.com.br/listedCompaniesProxy/CompanyCall/GetInitialCompanies/'
 URL_AUX = {
@@ -22,28 +19,6 @@ URL_DETAILED_AUX = {
     "codeCVM": "10456",
     "language":"pt-br"
 }
-
-def make_request(method, url, **kwargs):
-    response = requests.request(method, url, **kwargs)
-
-    if response.status_code not in [200, 201]:
-        raise Exception(f'Erro ao fazer requisição {response.status_code}: {response.text}')
-    return response.json()
-
-
-def convert_to_base64(string: str) -> str:
-    return base64.b64encode(string.encode('utf-8')).decode('utf-8')
-
-
-def parallel_apply(df, func, column, max_workers=4):
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Cria um iterador com tqdm para exibir progresso
-        futures = {executor.submit(func, row): row for row in df[column]}
-        for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing"):
-            results.append(future.result())
-    return results
-
 
 def get_total_pages() -> int:
     first_config = convert_to_base64(json.dumps(URL_AUX))
