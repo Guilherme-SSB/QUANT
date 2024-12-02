@@ -4,6 +4,7 @@
 
 import json
 import pandas as pd
+import ast
 
 from jobs_data.auxiliar import *
 
@@ -83,16 +84,19 @@ def format_companies(companies: pd.DataFrame) -> pd.DataFrame:
     companies['DT_LISTAGEM'] = pd.to_datetime(companies['DT_LISTAGEM'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
     # Criar novas colunas a partir da lista de dicionários
-    companies['codes'] = companies['otherCodes'].apply(
-        lambda x: [item['code'] for item in x] if isinstance(x, list) else []
-    )
-    companies['isins'] = companies['otherCodes'].apply(
-        lambda x: [item['isin'] for item in x] if isinstance(x, list) else []
-    )
+    companies['otherCodes'] = companies['otherCodes'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
 
-    companies.drop(columns=['otherCodes'], inplace=True)
+    companies_exploded = companies.explode('otherCodes', ignore_index=True)
 
-    return companies
+    # Agora, cria as novas colunas 'codes' e 'isins' a partir dos valores dos dicionários
+    companies_exploded['codes'] = companies_exploded['otherCodes'].apply(
+        lambda x: x['code'] if isinstance(x, dict) else None)
+    companies_exploded['isins'] = companies_exploded['otherCodes'].apply(
+        lambda x: x['isin'] if isinstance(x, dict) else None)
+
+    companies_exploded.drop(columns=['otherCodes'], inplace=True)
+
+    return companies_exploded
 
 
 def fetch_company_info(cod_cvm: str):
@@ -108,7 +112,7 @@ def fetch_company_info(cod_cvm: str):
 
 def get_companies():
     try:
-        companies = pd.read_csv(r'D:\GitHub\QUANT\jobs_data\data\companies.csv')
+        companies = pd.read_csv(r'D:\GitHub\QUANT\jobs_data\data\companies_raw.csv')
     except:
         urls = get_urls()
         companies = []
@@ -123,9 +127,10 @@ def get_companies():
         additional_df = pd.json_normalize(companies['additional_info'])
         companies = companies.merge(additional_df, on='codeCVM', how='left', suffixes=('', '_drop'))
 
-        companies = format_companies(companies)
+        companies.to_csv('D:\GitHub\QUANT\jobs_data\data\companies_raw.csv', index=False)
 
-        companies.to_csv('D:\GitHub\QUANT\jobs_data\data\companies.csv', index=False)
+    companies = format_companies(companies)
+    companies.to_csv('D:\GitHub\QUANT\jobs_data\data\companies_final.csv', index=False)
 
     return companies
 

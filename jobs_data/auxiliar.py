@@ -18,11 +18,11 @@ def convert_to_base64(string: str) -> str:
     return base64.b64encode(string.encode('utf-8')).decode('utf-8')
 
 
-def parallel_apply(df, func, column, max_workers=4):
+def parallel_apply(df, func, column, max_workers=4, **kwargs):
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Cria um iterador com tqdm para exibir progresso
-        futures = {executor.submit(func, row): row for row in df[column]}
+        futures = {executor.submit(func, row, **kwargs): row for row in df[column]}
         for future in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing"):
             results.append(future.result())
     return results
