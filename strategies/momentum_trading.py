@@ -167,6 +167,30 @@ def grid_search(tickers, start_date, end_date, short_window_range, long_window_r
     return best_params
 
 
+def consolidate_portfolio(portfolios):
+    """
+    Consolidate multiple portfolios into a single portfolio with equal weight allocation.
+
+    Args:
+        portfolios (dict): Dictionary of portfolios, where keys are tickers and values are DataFrames.
+
+    Returns:
+        pd.DataFrame: Consolidated portfolio performance.
+    """
+    consolidated = pd.DataFrame()
+    for ticker, portfolio in portfolios.items():
+        if consolidated.empty:
+            # Inicializa o portfólio consolidado com a contribuição do primeiro ativo
+            consolidated['total'] = portfolio['total'] / len(portfolios)
+        else:
+            # Soma a contribuição proporcional de cada ativo
+            consolidated['total'] += portfolio['total'] / len(portfolios)
+
+    # Calcula os retornos do portfólio consolidado
+    consolidated['returns'] = consolidated['total'].pct_change()
+    return consolidated
+
+
 def run_momentum_model(tickers, start_date, end_date, short_window=20, long_window=50):
     """
     Main function to execute the momentum strategy.
@@ -183,6 +207,7 @@ def run_momentum_model(tickers, start_date, end_date, short_window=20, long_wind
     """
     data = fetch_historical_data(tickers, start_date, end_date)
     reports = {}
+    portfolios = {}
 
     for ticker, df in data.items():
         if 'Close' not in df:
@@ -190,13 +215,17 @@ def run_momentum_model(tickers, start_date, end_date, short_window=20, long_wind
 
         signals = momentum_strategy(df['Close'], short_window, long_window)
         portfolio = backtest_strategy(signals)
+        portfolios[ticker] = portfolio
         report = generate_report(portfolio)
         reports[ticker] = report
 
         # Plot the strategy
         # plot_momentum_strategy(signals, ticker)
 
-    return reports
+    consolidated_portfolio = consolidate_portfolio(portfolios)
+    consolidated_report = generate_report(consolidated_portfolio)
+
+    return reports, consolidated_report
 
 
 # Example Usage
@@ -213,7 +242,7 @@ best_params = grid_search(tickers, date_start, date_end, short_window_range, lon
 for ticker, params in best_params.items():
     print(f"Best parameters for {ticker}: {params}")
 
-reports = run_momentum_model(tickers, date_start, date_end)  # Run with default windows or optimized values
+reports, portfolio_report = run_momentum_model(tickers, date_start, date_end)  # Run with default windows or optimized values
 for ticker, report in reports.items():
     print(f"Report for {ticker}:")
     for key, value in report.items():
