@@ -191,28 +191,32 @@ def consolidate_portfolio(portfolios):
     return consolidated
 
 
-def run_momentum_model(tickers, start_date, end_date, short_window=20, long_window=50):
+def run_momentum_model(tickers, start_date, end_date, best_params):
     """
-    Main function to execute the momentum strategy.
+    Execute the momentum strategy using the best parameters from grid search.
 
     Args:
         tickers (list): List of stock tickers.
         start_date (str): Start date for historical data.
         end_date (str): End date for historical data.
-        short_window (int): Short window for moving average.
-        long_window (int): Long window for moving average.
+        best_params (dict): Dictionary containing the best parameters for each ticker.
 
     Returns:
-        dict: Performance reports for each ticker.
+        dict: Performance reports for each ticker and the consolidated portfolio.
     """
     data = fetch_historical_data(tickers, start_date, end_date)
     reports = {}
     portfolios = {}
 
     for ticker, df in data.items():
-        if 'Close' not in df:
+        if 'Close' not in df or ticker not in best_params:
             continue
 
+        # Retrieve best parameters for the ticker
+        short_window = best_params[ticker]['Best Short Window']
+        long_window = best_params[ticker]['Best Long Window']
+
+        # Run the strategy with the best parameters
         signals = momentum_strategy(df['Close'], short_window, long_window)
         portfolio = backtest_strategy(signals)
         portfolios[ticker] = portfolio
@@ -222,10 +226,16 @@ def run_momentum_model(tickers, start_date, end_date, short_window=20, long_wind
         # Plot the strategy
         # plot_momentum_strategy(signals, ticker)
 
+    # Consolidate the portfolios and generate a consolidated report
     consolidated_portfolio = consolidate_portfolio(portfolios)
     consolidated_report = generate_report(consolidated_portfolio)
 
-    return reports, consolidated_report
+    print("\nConsolidated Portfolio Report:")
+    for key, value in consolidated_report.items():
+        print(f"{key}: {value}")
+
+    reports['Consolidated'] = consolidated_report
+    return reports
 
 
 # Example Usage
@@ -234,7 +244,7 @@ tickers = [
     'ABEV3.SA', 'MGLU3.SA', 'WEGE3.SA', 'ELET3.SA', 'ELET6.SA'
 ]
 date_start = '2020-01-01'
-date_end = '2023-12-31'
+date_end = '2024-12-31'
 short_window_range = range(5, 51, 5)
 long_window_range = range(10, 101, 10)
 
@@ -242,7 +252,7 @@ best_params = grid_search(tickers, date_start, date_end, short_window_range, lon
 for ticker, params in best_params.items():
     print(f"Best parameters for {ticker}: {params}")
 
-reports, portfolio_report = run_momentum_model(tickers, date_start, date_end)  # Run with default windows or optimized values
+reports = run_momentum_model(tickers, date_start, date_end, best_params)
 for ticker, report in reports.items():
     print(f"Report for {ticker}:")
     for key, value in report.items():
