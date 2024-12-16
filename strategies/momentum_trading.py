@@ -37,8 +37,9 @@ def momentum_strategy(prices, short_window=20, long_window=50):
     signals.loc[signals['short_mavg'] > signals['long_mavg'], 'signal'] = 1
     signals.loc[signals['short_mavg'] <= signals['long_mavg'], 'signal'] = -1
 
-    # Create buy/sell positions
+    # Create buy/sell positions only when signal changes
     signals['position'] = signals['signal'].diff()
+    signals['position'] = signals['position'].fillna(0)  # Handle NaN for the first row
 
     return signals
 
@@ -102,11 +103,13 @@ def plot_momentum_strategy(signals, ticker):
     plt.plot(signals.index, signals['short_mavg'], label='Short Moving Average', color='blue', linestyle='--')
     plt.plot(signals.index, signals['long_mavg'], label='Long Moving Average', color='red', linestyle='--')
 
-    # Highlight buy and sell signals
-    buy_signals = signals[signals['signal'] == 1]
-    sell_signals = signals[signals['signal'] == -1]
-    plt.scatter(buy_signals.index, buy_signals['price'], label='Buy Signal', marker='^', color='green', alpha=1)
-    plt.scatter(sell_signals.index, sell_signals['price'], label='Sell Signal', marker='v', color='red', alpha=1)
+    # Highlight buy and sell signals only when there is a change in signal
+    buy_signals = signals[signals['position'] == 2]  # Change from -1 to 1
+    sell_signals = signals[signals['position'] == -2]  # Change from 1 to -1
+    plt.scatter(buy_signals.index, buy_signals['price'], label='Buy Signal', marker='^', color='green', alpha=1,
+                edgecolor='k')
+    plt.scatter(sell_signals.index, sell_signals['price'], label='Sell Signal', marker='v', color='red', alpha=1,
+                edgecolor='k')
 
     plt.title(f"Momentum Strategy for {ticker}")
     plt.xlabel("Date")
@@ -143,7 +146,7 @@ def run_momentum_model(tickers, start_date, end_date, short_window=20, long_wind
         reports[ticker] = report
 
         # Plot the strategy
-        plot_momentum_strategy(signals, ticker)
+        # plot_momentum_strategy(signals, ticker)
 
     return reports
 
