@@ -2,6 +2,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from itertools import product
 
 
 def fetch_historical_data(tickers, start_date, end_date):
@@ -119,6 +120,53 @@ def plot_momentum_strategy(signals, ticker):
     plt.show()
 
 
+def grid_search(tickers, start_date, end_date, short_window_range, long_window_range):
+    """
+    Perform a grid search to optimize short and long window parameters.
+
+    Args:
+        tickers (list): List of stock tickers.
+        start_date (str): Start date for historical data.
+        end_date (str): End date for historical data.
+        short_window_range (list): Range of values for short window.
+        long_window_range (list): Range of values for long window.
+
+    Returns:
+        dict: Best parameters and performance metrics for each ticker.
+    """
+    data = fetch_historical_data(tickers, start_date, end_date)
+    best_params = {}
+
+    for ticker, df in data.items():
+        if 'Close' not in df:
+            continue
+
+        best_sharpe = -np.inf
+        best_combination = None
+
+        for short_window, long_window in product(short_window_range, long_window_range):
+            if short_window >= long_window:
+                continue  # Skip invalid combinations
+
+            signals = momentum_strategy(df['Close'], short_window, long_window)
+            portfolio = backtest_strategy(signals)
+            report = generate_report(portfolio)
+
+            sharpe_ratio = float(report['Sharpe Ratio'])
+
+            if sharpe_ratio > best_sharpe:
+                best_sharpe = sharpe_ratio
+                best_combination = (short_window, long_window)
+
+        best_params[ticker] = {
+            'Best Short Window': best_combination[0],
+            'Best Long Window': best_combination[1],
+            'Best Sharpe Ratio': best_sharpe
+        }
+
+    return best_params
+
+
 def run_momentum_model(tickers, start_date, end_date, short_window=20, long_window=50):
     """
     Main function to execute the momentum strategy.
@@ -158,8 +206,14 @@ tickers = [
 ]
 date_start = '2020-01-01'
 date_end = '2023-12-31'
-reports = run_momentum_model(tickers, date_start, date_end)
+short_window_range = range(5, 51, 5)
+long_window_range = range(10, 101, 10)
 
+best_params = grid_search(tickers, date_start, date_end, short_window_range, long_window_range)
+for ticker, params in best_params.items():
+    print(f"Best parameters for {ticker}: {params}")
+
+reports = run_momentum_model(tickers, date_start, date_end)  # Run with default windows or optimized values
 for ticker, report in reports.items():
     print(f"Report for {ticker}:")
     for key, value in report.items():
